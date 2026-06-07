@@ -9,7 +9,7 @@ from _pytest.monkeypatch import MonkeyPatch
 from requests_mock import Mocker
 
 from diff_poetry_lock import __version__
-from diff_poetry_lock.github import MAGIC_COMMENT_IDENTIFIER, GithubApi
+from diff_poetry_lock.github_api import MAGIC_COMMENT_IDENTIFIER, GithubApi
 from diff_poetry_lock.run_poetry import PackageSummary, diff, do_diff, format_comment, load_packages, main
 from diff_poetry_lock.settings import (
     GitHubActionsSettings,
