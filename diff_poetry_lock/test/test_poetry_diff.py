@@ -224,6 +224,25 @@ def test_file_loading_missing_file_head_ref(cfg: Settings, data1: bytes) -> None
             do_diff(cfg)
 
 
+def test_get_file_uses_bearer_auth_header(cfg: Settings, data1: bytes) -> None:
+    with requests_mock.Mocker() as m:
+        mock_repo(m, cfg)
+        m.get(
+            f"{cfg.api_url}/repos/{cfg.repository}/contents/{cfg.lockfile_path}?ref={cfg.base_ref}",
+            content=data1,
+            request_headers={
+                "Authorization": f"Bearer {cfg.token}",
+                "Accept": "application/vnd.github.raw",
+            },
+        )
+
+        api = GithubApi(cfg)
+
+        response = api.get_file(cfg.base_ref)
+
+        assert response.content == data1
+
+
 def test_e2e_no_diff_existing_comment(cfg: Settings, data1: bytes) -> None:
     with requests_mock.Mocker() as m:
         mock_get_file(m, cfg, data1, cfg.base_ref)
