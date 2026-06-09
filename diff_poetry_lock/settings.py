@@ -72,21 +72,7 @@ class VelaSettings(BaseSettings, Settings):
 
     @property
     def pr_num(self) -> str | None:  # type: ignore[override]
-        if self._pr_num_cached:
-            return self._pr_num_cached
-
-        if self._pr_lookup_service is None:
-            logger.warning("PR lookup requested before service configured; returning None")
-            return None
-
-        logger.debug("VelaSettings.pr_num looking up PR for branch {}", self.ref)
-        pr_num = self._pr_lookup_service.find_pr_for_branch(self.ref)
-        self._pr_num_cached = pr_num
-        if pr_num:
-            logger.debug("VelaSettings.pr_num found PR #{}", pr_num)
-        else:
-            logger.warning("VelaSettings.pr_num found no open PR")
-        return pr_num
+        return self.ref.split("/")[3]
 
 
 class GitHubActionsSettings(BaseSettings, Settings):
