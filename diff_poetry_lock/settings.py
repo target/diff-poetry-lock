@@ -72,7 +72,7 @@ class VelaSettings(BaseSettings, Settings):
 
     @property
     def pr_num(self) -> str | None:  # type: ignore[override]
-        return self.ref.split("/")[3]
+        return self.ref.split("/")[2]
 
 
 class GitHubActionsSettings(BaseSettings, Settings):
