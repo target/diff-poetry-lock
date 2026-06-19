@@ -8,7 +8,7 @@ from poetry.core.packages.package import Package
 from poetry.packages import Locker
 
 from diff_poetry_lock import __version__
-from diff_poetry_lock.github import GithubApi
+from diff_poetry_lock.github_api import GithubApi
 from diff_poetry_lock.logging_utils import configure_logging
 from diff_poetry_lock.settings import Settings, determine_and_load_settings
 

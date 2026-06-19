@@ -9,7 +9,7 @@ from _pytest.monkeypatch import MonkeyPatch
 from requests_mock import Mocker
 
 from diff_poetry_lock import __version__
-from diff_poetry_lock.github import MAGIC_COMMENT_IDENTIFIER, GithubApi
+from diff_poetry_lock.github_api import MAGIC_COMMENT_IDENTIFIER, GithubApi
 from diff_poetry_lock.run_poetry import PackageSummary, diff, do_diff, format_comment, load_packages, main
 from diff_poetry_lock.settings import (
     GitHubActionsSettings,
@@ -55,7 +55,7 @@ def test_settings(monkeypatch: MonkeyPatch) -> None:
 
 def test_vela_settings(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setenv("VELA_BUILD_EVENT", "push")
-    monkeypatch.setenv("VELA_BUILD_REF", "refs/pull/42/merge")
+    monkeypatch.setenv("VELA_BUILD_REF", "refs/pull/42/head")
     monkeypatch.setenv("VELA_REPO_FULL_NAME", "account/repo")
     monkeypatch.setenv("VELA_REPO_BRANCH", "main")
     monkeypatch.setenv("PARAMETER_GITHUB_TOKEN", "vela-token")
@@ -64,7 +64,7 @@ def test_vela_settings(monkeypatch: MonkeyPatch) -> None:
 
     s = VelaSettings()
     assert s.event_name == "push"
-    assert s.ref == "refs/pull/42/merge"
+    assert s.ref == "refs/pull/42/head"
     assert s.repository == "account/repo"
     assert s.base_ref == "refs/heads/main"
     assert s.pr_num == "42"

@@ -89,7 +89,7 @@ class GithubApi:
 
         all_comments = issue.get_comments()
 
-        logger.debug("Found %d comments", all_comments.totalCount)
+        logger.debug("Found {} comments", all_comments.totalCount)
 
         def is_diff_comment(comment: IssueComment) -> bool:
             return comment.body.startswith(MAGIC_COMMENT_IDENTIFIER)
