@@ -10,7 +10,7 @@ from github.Repository import Repository
 from loguru import logger
 from requests import Response
 
-from diff_poetry_lock.settings import PrLookupConfigurable, Settings
+from diff_poetry_lock.settings import Settings
 from diff_poetry_lock.utils import get_nested
 
 MAGIC_COMMENT_IDENTIFIER = "<!-- posted by target/diff-poetry-lock -->\n\n"
@@ -31,8 +31,6 @@ class GithubApi:
         self.requester = self.github.requester
         self._ref_hash_cache: dict[str, str] = {}
 
-        if isinstance(self.s, PrLookupConfigurable):
-            self.s.set_pr_lookup_service(self)
 
     @property
     def repo(self) -> Repository:
