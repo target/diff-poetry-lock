@@ -102,7 +102,7 @@ class GithubApi:
         r = self.session.get(
             f"{self.s.api_url}/repos/{self.s.repository}/contents/{self.s.lockfile_path}",
             params={"ref": ref},
-            headers={"Authorization": self.s.token, "Accept": "application/vnd.github.raw"},
+            headers=self.Headers.RAW.headers(self.s.token),
             timeout=10,
             stream=True,
         )
