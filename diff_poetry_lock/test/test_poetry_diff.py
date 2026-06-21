@@ -50,7 +50,7 @@ def test_settings(monkeypatch: MonkeyPatch) -> None:
     assert s.head_ref == "use-github-package"
     assert s.repository == "account/repo"
     assert s.base_ref == "main"
-    assert s.pr_num == "42"
+    assert s.pr_num == 42
 
 
 def test_vela_settings(monkeypatch: MonkeyPatch) -> None:
@@ -67,7 +67,7 @@ def test_vela_settings(monkeypatch: MonkeyPatch) -> None:
     assert s.ref == "refs/pull/42/head"
     assert s.repository == "account/repo"
     assert s.base_ref == "refs/heads/main"
-    assert s.pr_num == "42"
+    assert s.pr_num == 42
 
 
 def test_settings_not_pr(monkeypatch: MonkeyPatch) -> None:
@@ -334,8 +334,8 @@ def test_resolve_commit_hash_request_exception_returns_ref(cfg: Settings, monkey
 
     monkeypatch.setattr(api.requester, "graphql_query", raise_timeout)
 
-    resolved_head, resolved_base = api.resolve_commit_hashes(cfg.ref, cfg.base_ref)
-    assert resolved_head == cfg.ref
+    resolved_head, resolved_base = api.resolve_commit_hashes()
+    assert resolved_head == cfg.head_ref
     assert resolved_base == cfg.base_ref
 
 
@@ -344,7 +344,7 @@ def test_resolve_commit_hash_cache_hit_uses_cached_value(cfg: Settings) -> None:
 
     with requests_mock.Mocker() as m:
         mock_resolve_commit_hashes(m, cfg, head_hash="cached-sha", base_hash="base-sha")
-        resolved_head, resolved_base = api.resolve_commit_hashes(cfg.ref, cfg.base_ref)
+        resolved_head, resolved_base = api.resolve_commit_hashes()
 
     assert resolved_head == "cached-sha"
     assert resolved_base == "base-sha"
@@ -355,8 +355,8 @@ def test_resolve_commit_hash_cache_miss_returns_ref(cfg: Settings) -> None:
 
     with requests_mock.Mocker() as m:
         mock_resolve_commit_hashes(m, cfg)
-        resolved_head, resolved_base = api.resolve_commit_hashes(cfg.ref, cfg.base_ref)
-        assert resolved_head == cfg.ref
+        resolved_head, resolved_base = api.resolve_commit_hashes()
+        assert resolved_head == cfg.head_ref
         assert resolved_base == cfg.base_ref
 
 
@@ -414,8 +414,10 @@ def mock_resolve_commit_hashes(
     response_json = {
         "data": {
             "repository": {
-                "head": {"target": {"oid": head_hash}} if head_hash else None,
-                "base": {"target": {"oid": base_hash}} if base_hash else None,
+                "pullRequest": {
+                    "headRefOid": head_hash if head_hash else None,
+                    "baseRefOid": base_hash if base_hash else None,
+                }
             }
         }
     }

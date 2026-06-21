@@ -1,10 +1,11 @@
 import os
+import re
 import sys
 from abc import ABC
 from typing import Any, ClassVar
 
 from loguru import logger
-from pydantic import BaseSettings, Field, PrivateAttr, ValidationError, validator
+from pydantic import BaseSettings, Field, ValidationError, validator
 
 
 class Settings(ABC):
@@ -30,9 +31,10 @@ class Settings(ABC):
 
     @property
     # todo: Avoid this MyPy error by having Pydantic compute the field
-    def pr_num(self) -> str | None:  # type: ignore[override]
+    def pr_num(self) -> int | None:  # type: ignore[override]
         # TODO: Validate early
-        return self.ref.split("/")[2]
+        match = re.fullmatch(r"refs/pull/(\d+)/(?:head|merge)", self.ref)
+        return int(match.group(1)) if match else None
 
 
 class VelaSettings(BaseSettings, Settings):

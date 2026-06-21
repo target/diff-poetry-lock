@@ -31,7 +31,6 @@ class GithubApi:
         self.requester = self.github.requester
         self._ref_hash_cache: dict[str, str] = {}
 
-
     @property
     def repo(self) -> Repository:
         if self._repo is None:
@@ -113,46 +112,51 @@ class GithubApi:
         r.raise_for_status()
         return r
 
-    def resolve_commit_hashes(self, head_ref: str, base_ref: str) -> tuple[str, str]:
-        cached_head_hash = self._ref_hash_cache.get(head_ref)
-        cached_base_hash = self._ref_hash_cache.get(base_ref)
+    def resolve_commit_hashes(self) -> tuple[str, str]:
+        cached_head_hash = self._ref_hash_cache.get(self.s.head_ref)
+        cached_base_hash = self._ref_hash_cache.get(self.s.base_ref)
         if cached_head_hash and cached_base_hash:
-            logger.debug("Using cached commit hashes for head_ref {} and base_ref {}", head_ref, base_ref)
+            logger.debug("Using cached commit hashes for head_ref {} and base_ref {}", self.s.head_ref, self.s.base_ref)
             return cached_head_hash, cached_base_hash
+
+        if not self.s.pr_num:
+            logger.warning("No PR number available; skipping commit hash resolution")
+            return self.s.head_ref, self.s.base_ref
 
         owner, repo_name = self.s.repository.split("/", maxsplit=1)
         query = (
-            "query($owner:String!, $name:String!, $head:String!, $base:String!){"
+            "query($owner:String!, $name:String!, $number:Int!){"
             " repository(owner:$owner, name:$name){"
-            "  head:ref(qualifiedName:$head){ target { ... on Commit { oid } } }"
-            "  base:ref(qualifiedName:$base){ target { ... on Commit { oid } } }"
+            "  pullRequest(number:$number) { headRefOid baseRefOid }"
             " }"
             "}"
         )
         variables = {
             "owner": owner,
             "name": repo_name,
-            "head": self._qualified_ref(head_ref),
-            "base": self._qualified_ref(base_ref),
+            "number": self.s.pr_num,
         }
 
         try:
             _, response_json = self.requester.graphql_query(query, variables)
 
             repo_data = response_json.get("data", {}).get("repository", {})
-            resolved_head_hash = str(get_nested(repo_data, ("head", "target", "oid")) or "").strip()
-            resolved_base_hash = str(get_nested(repo_data, ("base", "target", "oid")) or "").strip()
+
+            resolved_head_hash = str(get_nested(repo_data, ("pullRequest", "headRefOid")) or "").strip()
+
+            resolved_base_hash = str(get_nested(repo_data, ("pullRequest", "baseRefOid")) or "").strip()
+
             if resolved_head_hash:
-                self._ref_hash_cache[head_ref] = resolved_head_hash
+                self._ref_hash_cache[self.s.head_ref] = resolved_head_hash
             if resolved_base_hash:
-                self._ref_hash_cache[base_ref] = resolved_base_hash
+                self._ref_hash_cache[self.s.base_ref] = resolved_base_hash
 
         except (GithubException, ValueError, TypeError):
             logger.exception("Failed to resolve commit hashes via GraphQL")
 
-        resolved_head_hash = self._ref_hash_cache.get(head_ref, head_ref)
-        resolved_base_hash = self._ref_hash_cache.get(base_ref, base_ref)
-        if resolved_head_hash == head_ref or resolved_base_hash == base_ref:
+        resolved_head_hash = self._ref_hash_cache.get(self.s.head_ref, self.s.head_ref)
+        resolved_base_hash = self._ref_hash_cache.get(self.s.base_ref, self.s.base_ref)
+        if resolved_head_hash == self.s.head_ref or resolved_base_hash == self.s.base_ref:
             logger.warning("Could not resolve one or more commit hashes, falling back to provided refs")
         return resolved_head_hash, resolved_base_hash
 
@@ -163,12 +167,6 @@ class GithubApi:
             return f"{parsed.scheme}://{parsed.netloc}{graphql_path}"
 
         return f"{self.s.api_url.rstrip('/')}/graphql"
-
-    @staticmethod
-    def _qualified_ref(ref: str) -> str:
-        if ref.startswith("refs/"):
-            return ref
-        return f"refs/heads/{ref}"
 
     def delete_comment(self, comment_id: int) -> None:
         logger.debug("Deleting comment {}", comment_id)
