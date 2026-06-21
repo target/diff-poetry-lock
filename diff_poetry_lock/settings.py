@@ -30,8 +30,7 @@ class Settings(ABC):
         return any(key.lower() == cls.sigil_envvar.lower() for key in env)
 
     @property
-    # todo: Avoid this MyPy error by having Pydantic compute the field
-    def pr_num(self) -> int | None:  # type: ignore[override]
+    def pr_num(self) -> int | None:
         # TODO: Validate early
         match = re.fullmatch(r"refs/pull/(\d+)/(?:head|merge)", self.ref)
         return int(match.group(1)) if match else None
