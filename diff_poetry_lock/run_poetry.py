@@ -1,6 +1,7 @@
 import tempfile
 from operator import attrgetter
 from pathlib import Path
+from re import search
 
 import pydantic
 from loguru import logger
@@ -39,19 +40,50 @@ class PackageSummary:
     def removed(self) -> bool:
         return self.new_version is None and self.old_version is not None
 
-    def summary_line(self) -> str:
-        if self.updated():
-            return f"Updated **{self.name}** ({self.old_version} -> {self.new_version})"
-        if self.added() and self.new_version is not None:
-            return f"Added **{self.name}** ({self.new_version})"
-        if self.removed() and self.old_version is not None:
-            return f"Removed **{self.name}** ({self.old_version})"
-
-        if self.new_version is None:
-            msg = "Inconsistent State"
+    @staticmethod
+    def _version_core(version: str) -> str:
+        match = search(r"\d+(?:\.\d+)*", version)
+        if match is None:
+            msg = f"Could not parse numeric version from '{version}'"
             raise ValueError(msg)
+        return match.group(0)
 
-        return f"Not changed **{self.name}** ({self.new_version})"
+    @classmethod
+    def _version_tuple(cls, version: str) -> tuple[int, int, int]:
+        parts = [int(part) for part in cls._version_core(version).split(".")]
+        while len(parts) < 3:
+            parts.append(0)
+        return parts[0], parts[1], parts[2]
+
+    def upgrade_type(self) -> str:
+        if self.added():
+            return "new"
+        if self.removed():
+            return "drop"
+        if self.updated() and self.old_version is not None and self.new_version is not None:
+            old_major, old_minor, old_patch = self._version_tuple(self.old_version)
+            new_major, new_minor, new_patch = self._version_tuple(self.new_version)
+            if new_major != old_major:
+                return "major"
+            if new_minor != old_minor:
+                return "minor"
+            if new_patch != old_patch:
+                return "patch"
+            return "patch"
+
+        msg = "Inconsistent State"
+        raise ValueError(msg)
+
+    def table_row(self) -> str:
+        action = "Updated"
+        old_version = self.old_version or ""
+        new_version = self.new_version or ""
+        if self.added():
+            action = "Added"
+        elif self.removed():
+            action = "Removed"
+
+        return f"|{action}|{self.name}|{old_version}|{new_version}|{self.upgrade_type()}|"
 
 
 def diff(old_packages: list[Package], new_packages: list[Package]) -> list[PackageSummary]:
@@ -97,7 +129,9 @@ def format_comment(
     comment = f"### Detected {change_count} changes to dependencies in Poetry lockfile\n\n"
     if base_commit_hash and head_commit_hash:
         comment += f"From base {base_commit_hash} to head {head_commit_hash}:\n\n"
-    summary_lines = [p.summary_line() for p in added + removed + updated]
+    comment += "|Action|Package|Old version|New version|Upgrade type\n"
+    comment += "|---|---|---|---|---|\n"
+    summary_lines = [p.table_row() for p in added + removed + updated]
     comment += "\n".join(summary_lines)
     comment += (
         f"\n\n*({len(added)} added, {len(removed)} removed, {len(updated)} updated, {len(not_changed)} not changed)*"

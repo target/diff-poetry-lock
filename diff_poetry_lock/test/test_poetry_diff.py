@@ -107,9 +107,11 @@ def test_diff() -> None:
 
     From base new-sha to head old-sha:
 
-    Removed **pydantic** (1.10.6)
-    Removed **typing-extensions** (4.5.0)
-    Updated **urllib3** (1.26.15 -> 1.26.14)
+    |Action|Package|Old version|New version|Upgrade type
+    |---|---|---|---|---|
+    |Removed|pydantic|1.10.6||drop|
+    |Removed|typing-extensions|4.5.0||drop|
+    |Updated|urllib3|1.26.15|1.26.14|patch|
 
     *(0 added, 2 removed, 1 updated, 4 not changed)*
 
@@ -147,9 +149,11 @@ def test_diff_2() -> None:
 
     From base new-sha to head old-sha:
 
-    Added **pydantic** (1.10.6)
-    Added **typing-extensions** (4.5.0)
-    Updated **urllib3** (1.26.14 -> 1.26.15)
+    |Action|Package|Old version|New version|Upgrade type
+    |---|---|---|---|---|
+    |Added|pydantic||1.10.6|new|
+    |Added|typing-extensions||4.5.0|new|
+    |Updated|urllib3|1.26.14|1.26.15|patch|
 
     *(2 added, 0 removed, 1 updated, 4 not changed)*
 
@@ -180,6 +184,14 @@ def test_diff_no_changes() -> None:
     ]
     assert summary == expected
     assert format_comment(summary) is None
+
+
+def test_upgrade_type_classification() -> None:
+    assert PackageSummary(name="a", old_version=None, new_version="0.7.3").upgrade_type() == "new"
+    assert PackageSummary(name="a", old_version="0.7.3", new_version=None).upgrade_type() == "drop"
+    assert PackageSummary(name="a", old_version="1.2.0", new_version="2.0.0").upgrade_type() == "major"
+    assert PackageSummary(name="a", old_version="1.2.0", new_version="1.3.0").upgrade_type() == "minor"
+    assert PackageSummary(name="a", old_version="1.2.3", new_version="1.2.4").upgrade_type() == "patch"
 
 
 def test_file_loading_missing_file_base_ref(cfg: Settings) -> None:
