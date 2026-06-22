@@ -23,7 +23,7 @@ jobs:
       - name: Install and configure Poetry
         uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # v1.4.1
         with:
-          version: '1.4.0'
+          version: '2.3.2'
           virtualenvs-create: true
           virtualenvs-in-project: true
       - name: Install dependencies
@@ -40,12 +40,20 @@ jobs:
     runs-on: ubuntu-latest
     name: Dogfooding main
     continue-on-error: true
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     steps:
       - name: Checkout
         if: '!inputs.skip-checkout'
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          sparse-checkout: poetry.lock
           persist-credentials: false
       - name: Diff poetry.lock
+        env:
+          DEBUG_MODE: 1
         uses: | # zizmor: ignore[unpinned-uses] It's safe to use main on our own repo.
           target/diff-poetry-lock@main

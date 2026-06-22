@@ -1,28 +1,20 @@
 import os
+import re
 import sys
 from abc import ABC
-from typing import Any, ClassVar, Protocol, runtime_checkable
+from typing import Any, ClassVar
 
 from loguru import logger
-from pydantic import BaseSettings, Field, PrivateAttr, SecretStr, ValidationError, validator
-
-
-class PrLookupService(Protocol):
-    def find_pr_for_branch(self, branch_ref: str) -> str: ...
-
-
-@runtime_checkable
-class PrLookupConfigurable(Protocol):
-    def set_pr_lookup_service(self, service: PrLookupService) -> None: ...
+from pydantic import BaseSettings, Field, SecretStr, ValidationError, validator
 
 
 class Settings(ABC):
     # from CI
     event_name: str
     ref: str
+    head_ref: str
     repository: str
     base_ref: str
-    pr_num: str | None
 
     # from step config including secrets
     token: str
@@ -37,15 +29,20 @@ class Settings(ABC):
         """Check whether this CI's identifying env var is present."""
         return any(key.lower() == cls.sigil_envvar.lower() for key in env)
 
+    @property
+    def pr_num(self) -> int | None:
+        # TODO: Validate early
+        match = re.fullmatch(r"refs/pull/(\d+)/(?:head|merge)", self.ref)
+        return int(match.group(1)) if match else None
+
 
 class VelaSettings(BaseSettings, Settings):
     sigil_envvar: ClassVar[str] = "VELA_REPO_FULL_NAME"
-    _pr_lookup_service: PrLookupService | None = PrivateAttr(default=None)
-    _pr_num_cached: str = PrivateAttr(default="")
 
     # from CI
     event_name: str = Field(env="VELA_BUILD_EVENT")
-    ref: str = Field(env="VELA_BUILD_REF")
+    head_ref: str = Field(env="VELA_BUILD_REF")
+    ref: str = head_ref
     repository: str = Field(env="VELA_REPO_FULL_NAME")
     base_ref: str = Field(default="", env=None)  # Calculated from VELA_REPO_BRANCH in __init__
 
@@ -65,27 +62,6 @@ class VelaSettings(BaseSettings, Settings):
         logger.debug("VelaSettings ref={}", self.ref)
         logger.debug("VelaSettings event_name={}", self.event_name)
 
-    def set_pr_lookup_service(self, service: PrLookupService) -> None:
-        self._pr_lookup_service = service
-
-    @property
-    def pr_num(self) -> str | None:  # type: ignore[override]
-        if self._pr_num_cached:
-            return self._pr_num_cached
-
-        if self._pr_lookup_service is None:
-            logger.warning("PR lookup requested before service configured; returning None")
-            return None
-
-        logger.debug("VelaSettings.pr_num looking up PR for branch {}", self.ref)
-        pr_num = self._pr_lookup_service.find_pr_for_branch(self.ref)
-        self._pr_num_cached = pr_num
-        if pr_num:
-            logger.debug("VelaSettings.pr_num found PR #{}", pr_num)
-        else:
-            logger.warning("VelaSettings.pr_num found no open PR")
-        return pr_num
-
 
 class GitHubActionsSettings(BaseSettings, Settings):
     sigil_envvar: ClassVar[str] = "github_repository"
@@ -95,6 +71,7 @@ class GitHubActionsSettings(BaseSettings, Settings):
     ref: str = Field(env="github_ref")
     repository: str = Field(env="github_repository")
     base_ref: str = Field(env="github_base_ref")
+    head_ref: str = Field(env="github_head_ref")
 
     # from step config including secrets
     token: SecretStr = Field(env="input_github_token")
@@ -114,16 +91,11 @@ class GitHubActionsSettings(BaseSettings, Settings):
     @validator("event_name")
     @classmethod
     def event_must_be_pull_request(cls, v: str) -> str:
-        if v != "pull_request":
-            msg = "This Github Action can only be run in the context of a pull request"
+        allowed_events = ["pull_request", "pull_request_target"]
+        if v not in allowed_events:
+            msg = f"This Github Action can only run in the context of events {allowed_events}."
             raise ValueError(msg)
         return v
-
-    @property
-    # todo: Avoid this MyPy error by having Pydantic compute the field
-    def pr_num(self) -> str | None:  # type: ignore[override]
-        # TODO: Validate early
-        return self.ref.split("/")[2]
 
 
 _CI_SETTINGS_CANDIDATES: list[type[Settings]] = [GitHubActionsSettings, VelaSettings]

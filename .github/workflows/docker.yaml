@@ -13,7 +13,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 defaults:
   run:
@@ -141,6 +140,8 @@ jobs:
     if: github.repository_owner == 'target'
     name: docker (${{ matrix.arch }} Ubuntu ${{ matrix.version }})
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    permissions:
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -229,6 +230,8 @@ jobs:
     needs: [generate-tags, build]
     if: github.repository_owner == 'target' && fromJSON(needs.generate-tags.outputs.merge)
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
     strategy:
       fail-fast: false
       matrix:

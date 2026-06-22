@@ -13,10 +13,9 @@ inputs:
     default: "poetry.lock"
     required: false
   poetry_version:
-    description: "Version of poetry to use (defaults to latest)"
+    description: "Optional Poetry version to install in an isolated runtime venv before executing (for lockfile compatibility)"
     default: ""
     required: false
-
 runs:
   using: 'docker'
   image: 'Dockerfile'
