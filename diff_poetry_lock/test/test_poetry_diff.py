@@ -9,11 +9,10 @@ from _pytest.monkeypatch import MonkeyPatch
 from requests_mock import Mocker
 
 from diff_poetry_lock import __version__
-from diff_poetry_lock.github import MAGIC_COMMENT_IDENTIFIER, GithubApi
+from diff_poetry_lock.github_api import MAGIC_COMMENT_IDENTIFIER, GithubApi
 from diff_poetry_lock.run_poetry import PackageSummary, diff, do_diff, format_comment, load_packages, main
 from diff_poetry_lock.settings import (
     GitHubActionsSettings,
-    PrLookupConfigurable,
     Settings,
     VelaSettings,
 )
@@ -37,20 +36,6 @@ def data2() -> bytes:
     return load_file(TESTFILE_2)
 
 
-class _LookupService:
-    def __init__(self, settings: Settings) -> None:
-        self.s = settings
-        if isinstance(self.s, PrLookupConfigurable):
-            self.s.set_pr_lookup_service(self)
-
-    def find_pr_for_branch(self, branch_ref: str) -> str:
-        if branch_ref == "refs/heads/github-actions":
-            return "42"
-        if branch_ref == "refs/heads/vela":
-            return "1"
-        return ""
-
-
 def test_settings(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
     monkeypatch.setenv("GITHUB_REF", "refs/pull/42/merge")
@@ -65,12 +50,12 @@ def test_settings(monkeypatch: MonkeyPatch) -> None:
     assert s.head_ref == "use-github-package"
     assert s.repository == "account/repo"
     assert s.base_ref == "main"
-    assert s.pr_num == "42"
+    assert s.pr_num == 42
 
 
 def test_vela_settings(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setenv("VELA_BUILD_EVENT", "push")
-    monkeypatch.setenv("VELA_BUILD_REF", "refs/heads/vela")
+    monkeypatch.setenv("VELA_BUILD_REF", "refs/pull/42/head")
     monkeypatch.setenv("VELA_REPO_FULL_NAME", "account/repo")
     monkeypatch.setenv("VELA_REPO_BRANCH", "main")
     monkeypatch.setenv("PARAMETER_GITHUB_TOKEN", "vela-token")
@@ -79,14 +64,10 @@ def test_vela_settings(monkeypatch: MonkeyPatch) -> None:
 
     s = VelaSettings()
     assert s.event_name == "push"
-    assert s.ref == "refs/heads/vela"
+    assert s.ref == "refs/pull/42/head"
     assert s.repository == "account/repo"
     assert s.base_ref == "refs/heads/main"
-    assert s.pr_num is None
-
-    _LookupService(s)
-
-    assert s.pr_num == "1"
+    assert s.pr_num == 42
 
 
 def test_settings_not_pr(monkeypatch: MonkeyPatch) -> None:
@@ -353,8 +334,8 @@ def test_resolve_commit_hash_request_exception_returns_ref(cfg: Settings, monkey
 
     monkeypatch.setattr(api.requester, "graphql_query", raise_timeout)
 
-    resolved_head, resolved_base = api.resolve_commit_hashes(cfg.ref, cfg.base_ref)
-    assert resolved_head == cfg.ref
+    resolved_head, resolved_base = api.resolve_commit_hashes()
+    assert resolved_head == cfg.head_ref
     assert resolved_base == cfg.base_ref
 
 
@@ -363,7 +344,7 @@ def test_resolve_commit_hash_cache_hit_uses_cached_value(cfg: Settings) -> None:
 
     with requests_mock.Mocker() as m:
         mock_resolve_commit_hashes(m, cfg, head_hash="cached-sha", base_hash="base-sha")
-        resolved_head, resolved_base = api.resolve_commit_hashes(cfg.ref, cfg.base_ref)
+        resolved_head, resolved_base = api.resolve_commit_hashes()
 
     assert resolved_head == "cached-sha"
     assert resolved_base == "base-sha"
@@ -374,8 +355,8 @@ def test_resolve_commit_hash_cache_miss_returns_ref(cfg: Settings) -> None:
 
     with requests_mock.Mocker() as m:
         mock_resolve_commit_hashes(m, cfg)
-        resolved_head, resolved_base = api.resolve_commit_hashes(cfg.ref, cfg.base_ref)
-        assert resolved_head == cfg.ref
+        resolved_head, resolved_base = api.resolve_commit_hashes()
+        assert resolved_head == cfg.head_ref
         assert resolved_base == cfg.base_ref
 
 
@@ -433,8 +414,10 @@ def mock_resolve_commit_hashes(
     response_json = {
         "data": {
             "repository": {
-                "head": {"target": {"oid": head_hash}} if head_hash else None,
-                "base": {"target": {"oid": base_hash}} if base_hash else None,
+                "pullRequest": {
+                    "headRefOid": head_hash if head_hash else None,
+                    "baseRefOid": base_hash if base_hash else None,
+                }
             }
         }
     }
