@@ -13,6 +13,8 @@ FROM python:3.11-slim@sha256:0b23cfb7425d065008b778022a17b1551c82f8b4866ee5a7a20
 
 WORKDIR /src
 
+RUN useradd --system --shell /usr/sbin/nologin diffpoetrylock
+
 COPY --from=build /src/requirements.txt /tmp/requirements.txt
 COPY --from=build /src/dist/*.whl /tmp/
 RUN pip install --no-cache-dir --requirement /tmp/requirements.txt \
@@ -20,5 +22,9 @@ RUN pip install --no-cache-dir --requirement /tmp/requirements.txt \
 	&& rm -f /tmp/requirements.txt /tmp/*.whl
 
 COPY entrypoint.sh /src/entrypoint.sh
+RUN chmod 0755 /src/entrypoint.sh \
+	&& chown -R diffpoetrylock:diffpoetrylock /src
+
+USER diffpoetrylock
 
 ENTRYPOINT ["/src/entrypoint.sh"]
