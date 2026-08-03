@@ -26,7 +26,7 @@ class GithubApi:
     def __init__(self, settings: Settings) -> None:
         self.s = settings
         self.session = requests.session()
-        self.github = Github(auth=Auth.Token(self.s.token), base_url=self.s.api_url.rstrip("/"), per_page=100)
+        self.github = Github(auth=Auth.Token(self.s.token.get_secret_value()), base_url=self.s.api_url.rstrip("/"), per_page=100)
         self._repo: Repository | None = None
         self.requester = self.github.requester
         self._ref_hash_cache: dict[str, str] = {}
@@ -101,7 +101,7 @@ class GithubApi:
         r = self.session.get(
             f"{self.s.api_url}/repos/{self.s.repository}/contents/{self.s.lockfile_path}",
             params={"ref": ref},
-            headers=self.Headers.RAW.headers(self.s.token),
+            headers=self.Headers.RAW.headers(self.s.token.get_secret_value()),
             timeout=10,
             stream=True,
         )
