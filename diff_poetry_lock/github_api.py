@@ -26,7 +26,9 @@ class GithubApi:
     def __init__(self, settings: Settings) -> None:
         self.s = settings
         self.session = requests.session()
-        self.github = Github(auth=Auth.Token(self.s.token.get_secret_value()), base_url=self.s.api_url.rstrip("/"), per_page=100)
+        self.github = Github(auth=Auth.Token(self.s.token.get_secret_value()),
+                             base_url=self.s.api_url.rstrip("/"),
+                             per_page=100)
         self._repo: Repository | None = None
         self.requester = self.github.requester
         self._ref_hash_cache: dict[str, str] = {}
