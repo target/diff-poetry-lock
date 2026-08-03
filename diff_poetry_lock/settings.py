@@ -17,7 +17,7 @@ class Settings(ABC):
     base_ref: str
 
     # from step config including secrets
-    token: str
+    token: SecretStr
     lockfile_path: str
     api_url: str
 
