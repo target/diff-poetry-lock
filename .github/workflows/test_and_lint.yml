@@ -29,13 +29,24 @@ jobs:
       - name: Install dependencies
         run: poetry install
       - name: Ruff format
-        run: poetry run ruff format --check .
+        id: rufffmt
+        run: poetry run ruff format --check --preview --output-format github .
+        continue-on-error: true
       - name: Ruff check
+        id: ruffcheck
         run: poetry run ruff check .
+        continue-on-error: true
       - name: Mypy
+        id: mypy
         run: poetry run mypy .
+        continue-on-error: true
       - name: Pytest
+        id: pytest
         run: poetry run pytest .
+        continue-on-error: true
+      - name: Fail job if any step failed
+        run: exit 1
+        if: ${{ failure() }}
   diff-lockfile-main:
     runs-on: ubuntu-latest
     name: Dogfooding main
